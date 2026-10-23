@@ -135,16 +135,20 @@ li.item.picked .title { color: var(--c); }
 .flags { display: inline-flex; gap: 6px; color: var(--muted); }
 .flags svg { width: 14px; height: 14px; }
 .flags .place { font-size: .75rem; display: inline-flex; gap: 3px; align-items: center; max-width: 16ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.right { display: flex; align-items: center; gap: 4px; }
+.right { display: flex; align-items: center; gap: 6px; }
 .thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: var(--chip); }
 .stamp {
-  position: absolute; right: 64px; top: 50%; transform: translateY(-50%) rotate(-10deg);
-  font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; letter-spacing: .1em;
-  color: var(--stamp); border: 3px solid var(--stamp); border-radius: 6px; padding: 0 8px; opacity: .85; pointer-events: none;
+  display: inline-block; transform: rotate(-10deg); flex: none;
+  font-family: var(--font-display); font-weight: 900; font-size: 1.1rem; letter-spacing: .1em; line-height: 1.1;
+  color: var(--stamp); border: 2.5px solid var(--stamp); border-radius: 6px; padding: 1px 7px; opacity: .9; pointer-events: none;
 }
-.has-thumb .stamp { right: 110px; }
 .stamp.slam { animation: slam .45s cubic-bezier(.2,1.6,.4,1) both; }
-@keyframes slam { 0% { transform: translateY(-50%) rotate(-24deg) scale(2.6); opacity: 0; } 60% { opacity: .95; } 100% { transform: translateY(-50%) rotate(-10deg) scale(1); opacity: .85; } }
+.thumbwrap { position: relative; width: 56px; height: 56px; flex: none; }
+.thumbwrap .thumb { width: 56px; height: 56px; }
+.thumbwrap .stamp { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-12deg); font-size: .82rem; padding: 0 4px; border-width: 2px; background: rgba(255,255,255,.82); color: #c2321b; border-color: #c2321b; }
+.thumbwrap .stamp.slam { animation: slam2 .45s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes slam2 { 0% { transform: translate(-50%,-50%) rotate(-26deg) scale(2.6); opacity: 0; } 100% { transform: translate(-50%,-50%) rotate(-12deg) scale(1); opacity: 1; } }
+@keyframes slam { 0% { transform: rotate(-24deg) scale(2.6); opacity: 0; } 100% { transform: rotate(-10deg) scale(1); opacity: .9; } }
 .del { background: none; border: 0; color: var(--muted); width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; position: relative; z-index: 1; }
 .del:hover { background: var(--chip); color: var(--stamp); }
 .del svg { width: 18px; height: 18px; }
@@ -152,7 +156,14 @@ li.item.picked .title { color: var(--c); }
 .empty b { display: block; font-family: var(--font-display); font-size: 1.7rem; text-transform: uppercase; color: var(--ink); }
 
 /* Map */
-@media (prefers-color-scheme: dark) { #map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); } }
+@media (prefers-color-scheme: dark) { #map .osm-tiles { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); } }
+.mapstyles { display: flex; gap: 6px; flex-wrap: wrap; }
+.mapstyles button { border: 1.5px solid var(--line); background: var(--paper); color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: .8rem; font-weight: 700; }
+.mapstyles button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.photo-pin { width: 46px; height: 46px; border-radius: 50%; border: 3px solid var(--c); background: #fff center / cover no-repeat; box-shadow: 0 3px 10px rgba(0,0,0,.4); position: relative; }
+.photo-pin::after { content: ""; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--c); border-bottom: 0; }
+.pop .pop-img { display: block; width: 220px; max-width: 100%; height: 140px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: #e3ebf0; }
+.pop .stamp { font-size: .8rem; margin-left: 6px; vertical-align: middle; }
 #map { height: min(62vh, 560px); border-radius: 14px; border: 1px solid var(--line); background: var(--chip); z-index: 0; }
 .map-note { color: var(--muted); font-size: .85rem; margin: 0; }
 .pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); background: var(--c); border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); display: grid; place-items: center; }
@@ -258,8 +269,7 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
 @media (max-width: 440px) {
   .dial { width: 92px; height: 92px; }
   .dial .val b { font-size: 1.7rem; }
-  .stamp { font-size: 1.05rem; right: 56px; }
-  .has-thumb .stamp { right: 100px; }
+  .stamp { font-size: .95rem; }
   .bar-row { grid-template-columns: 84px 1fr auto; }
   .stat .v { font-size: 2rem; }
 }
@@ -317,6 +327,7 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
 
     <!-- MAP -->
     <section class="view" id="view-map" hidden>
+      <div class="mapstyles" id="mapStyles" role="group" aria-label="Map style"></div>
       <div id="map" role="region" aria-label="Map of goals"></div>
       <p class="map-note" id="mapNote"></p>
     </section>
@@ -559,16 +570,18 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
       body.appendChild(meta);
 
       const right = el("div", "right");
+      const stamp = it.done ? el("span", "stamp" + (justDone === it.id ? " slam" : ""), "DONE") : null;
       if (it.photos.length) {
-        const img = el("img", "thumb"); img.alt = ""; right.appendChild(img);
+        const tw = el("div", "thumbwrap"); const img = el("img", "thumb"); img.alt = ""; tw.appendChild(img);
+        if (stamp) tw.appendChild(stamp);
+        right.appendChild(tw);
         photoUrl(it.photos[0]).then(u => { if (u) img.src = u; });
-      }
+      } else if (stamp) right.appendChild(stamp);
       const del = el("button", "del"); del.type = "button"; del.innerHTML = ICON.bin; del.setAttribute("aria-label", "Delete " + it.title);
       del.addEventListener("click", (e) => { e.stopPropagation(); remove(it); });
       right.appendChild(del);
 
       li.append(tick, body, right);
-      if (it.done) li.appendChild(el("span", "stamp" + (justDone === it.id ? " slam" : ""), "DONE"));
       attachPress(li, it);
       list.appendChild(li);
     });
@@ -756,7 +769,7 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
     if (!it.loc) return;
     const c = el("div", "loc-card"); c.innerHTML = ICON.pin; c.appendChild(el("span", null, it.loc.label));
     const show = el("button", "btn-sm alt", "Map"); show.type = "button";
-    show.addEventListener("click", () => { const id = it.id; closeSheet(); setView("map"); focusPin(id); });
+    show.addEventListener("click", () => { const id = it.id; pendingFocus = id; closeSheet(); setView("map"); });
     const x = el("button", "x"); x.type = "button"; x.innerHTML = ICON.x; x.setAttribute("aria-label", "Remove place");
     x.addEventListener("click", () => { it.loc = null; save(); renderSheetLoc(it); });
     c.append(show, x); box.appendChild(c);
@@ -820,44 +833,81 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
   });
 
   // ---------- map ----------
-  let map = null, layer = null, markers = {};
+  let map = null, layer = null, markers = {}, base = null, mapStyle = "clean";
+  try { mapStyle = localStorage.getItem("bucket-list-mapstyle") || "clean"; } catch (e) {}
+  const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+  const esriAttr = "Tiles &copy; Esri";
+  const STYLES = {
+    clean: { label: "Clean", make: () => {
+      const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+      const k = dark ? "Dark" : "Light";
+      return L.layerGroup([
+        L.tileLayer(ESRI + "Canvas/World_" + k + "_Gray_Base/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16, attribution: esriAttr }),
+        L.tileLayer(ESRI + "Canvas/World_" + k + "_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16 }),
+      ]);
+    } },
+    satellite: { label: "Satellite", make: () => L.layerGroup([
+      L.tileLayer(ESRI + "World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 18, attribution: esriAttr + ", Maxar, Earthstar Geographics" }),
+      L.tileLayer(ESRI + "Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 18 }),
+    ]) },
+    terrain: { label: "Terrain", make: () => L.tileLayer(ESRI + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 18, attribution: esriAttr }) },
+    streets: { label: "Streets", make: () => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, className: "osm-tiles", attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }) },
+  };
+  function setMapStyle(k) {
+    if (!STYLES[k]) k = "clean"; mapStyle = k;
+    try { localStorage.setItem("bucket-list-mapstyle", k); } catch (e) {}
+    if (base) map.removeLayer(base);
+    base = STYLES[k].make().addTo(map);
+    document.querySelectorAll("#mapStyles button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.k === k)));
+  }
   function initMap() {
     if (map || !window.L) return;
-    map = L.map("map", { zoomControl: true, worldCopyJump: true }).setView([30, 0], 2);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    map = L.map("map", { zoomControl: true, worldCopyJump: true }).setView([54.4, -3.2], 5);
+    const box = $("mapStyles");
+    Object.entries(STYLES).forEach(([k, st]) => { const b = el("button", null, st.label); b.type = "button"; b.dataset.k = k; b.addEventListener("click", () => setMapStyle(k)); box.appendChild(b); });
+    const all = el("button", null, "Show all pins"); all.type = "button"; all.style.marginLeft = "auto";
+    all.addEventListener("click", () => { const pl = items.filter(i => i.loc); if (pl.length) map.fitBounds(L.latLngBounds(pl.map(i => [i.loc.lat, i.loc.lng])), { padding: [40, 40], maxZoom: 6 }); });
+    box.appendChild(all);
+    setMapStyle(mapStyle);
     layer = L.layerGroup().addTo(map);
   }
-  function renderMap() {
+  let mapGen = 0;
+  async function renderMap() {
     if (!window.L) { $("mapNote").textContent = "The map needs an internet connection to load."; return; }
     initMap(); setTimeout(() => map.invalidateSize(), 50);
-    layer.clearLayers(); markers = {};
+    const gen = ++mapGen;
     const placed = items.filter(i => i.loc);
+    const urls = {};
+    await Promise.all(placed.filter(i => i.photos && i.photos.length).map(async i => { urls[i.id] = await photoUrl(i.photos[0]); }));
+    if (gen !== mapGen) return;
+    layer.clearLayers(); markers = {};
     placed.forEach(it => {
-      const icon = L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -28],
-        html: '<div class="pin ' + (it.done ? "done" : "todo") + '" style="--c:' + catColor(it.category) + '">' + (it.done ? ICON.check : "") + "</div>" });
-      const m = L.marker([it.loc.lat, it.loc.lng], { icon, title: it.title }).addTo(layer);
-      const pop = el("div", "pop"); pop.appendChild(el("b", null, it.title));
+      const col = catColor(it.category), photo = urls[it.id];
+      let icon;
+      if (photo && it.done) {
+        icon = L.divIcon({ className: "", iconSize: [46, 46], iconAnchor: [23, 55], popupAnchor: [0, -52],
+          html: '<div class="photo-pin" style="--c:' + col + ';background-image:url(' + photo + ')"></div>' });
+      } else {
+        icon = L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -28],
+          html: '<div class="pin ' + (it.done ? "done" : "todo") + '" style="--c:' + col + '">' + (it.done ? ICON.check : "") + "</div>" });
+      }
+      const m = L.marker([it.loc.lat, it.loc.lng], { icon, title: it.title, zIndexOffset: it.done ? 500 : 0 }).addTo(layer);
+      const pop = el("div", "pop");
+      if (photo) { const im = el("img", "pop-img"); im.src = photo; im.alt = "Photo for " + it.title; pop.appendChild(im); }
+      const t = el("b", null, it.title); if (it.done) t.appendChild(el("span", "stamp", "DONE")); pop.appendChild(t);
       pop.appendChild(el("small", null, (it.done ? "Done " + fmtDate(it.doneAt) + " · " : "") + it.loc.label));
       const b = el("button", null, "Open"); b.type = "button"; b.addEventListener("click", () => { map.closePopup(); openSheet(it.id, false); });
-      pop.appendChild(b); m.bindPopup(pop);
+      pop.appendChild(b); m.bindPopup(pop, { maxWidth: 250, minWidth: 180 });
       markers[it.id] = m;
     });
-    if (placed.length) {
-      const bounds = L.latLngBounds(placed.map(i => [i.loc.lat, i.loc.lng]));
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 6 });
-    }
+    if (pendingFocus) { const id = pendingFocus; pendingFocus = null; const it = byId(id); if (it && it.loc) { map.setView([it.loc.lat, it.loc.lng], 8); if (markers[id]) markers[id].openPopup(); } }
     const without = items.length - placed.length;
     $("mapNote").textContent = placed.length
       ? placed.length + " goal" + (placed.length === 1 ? "" : "s") + " pinned. " + (without ? without + " more have no place yet. Open one and add a place to pin it." : "")
       : "No goals pinned yet. Open a goal, then search for a place to drop a pin here.";
   }
-  function focusPin(id) {
-    const it = byId(id); if (!it || !it.loc || !map) return;
-    setTimeout(() => { map.setView([it.loc.lat, it.loc.lng], 8); if (markers[id]) markers[id].openPopup(); }, 120);
-  }
+  let pendingFocus = null;
+  function focusPin(id) { pendingFocus = id; if (view === "map") renderMap(); }
 
   // ---------- stats ----------
   function renderStats() {
