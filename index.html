@@ -152,6 +152,7 @@ li.item.picked .title { color: var(--c); }
 .empty b { display: block; font-family: var(--font-display); font-size: 1.7rem; text-transform: uppercase; color: var(--ink); }
 
 /* Map */
+@media (prefers-color-scheme: dark) { #map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); } }
 #map { height: min(62vh, 560px); border-radius: 14px; border: 1px solid var(--line); background: var(--chip); z-index: 0; }
 .map-note { color: var(--muted); font-size: .85rem; margin: 0; }
 .pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); background: var(--c); border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); display: grid; place-items: center; }
@@ -823,10 +824,9 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
   function initMap() {
     if (map || !window.L) return;
     map = L.map("map", { zoomControl: true, worldCopyJump: true }).setView([30, 0], 2);
-    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/" + (dark ? "dark_all" : "rastertiles/voyager") + "/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19, subdomains: "abcd",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
     layer = L.layerGroup().addTo(map);
   }
