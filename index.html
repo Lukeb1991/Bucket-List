@@ -13,133 +13,115 @@
 <title>Bucket List</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-/* Layout: a bold ink "ticket booth" header band with a progress dial, then one column of colour-coded ticket rows. */
+/* Layout: ink "ticket booth" header band with progress dial, view switcher (List / Map / Stats), colour-coded ticket rows, bottom-sheet detail editor. */
 :root {
-  --bg: #eef1f4;
-  --paper: #ffffff;
-  --ink: #16212e;
-  --muted: #5d6b7a;
-  --line: #d3dae2;
-  --band: #16212e;
-  --band-fg: #f3f5f8;
-  --band-muted: #9fb0c2;
-  --accent: #ff6a3d;
-  --stamp: #d0381f;
-  --chip: #e3ebf0;
-  --c-thrill: #e0412b;
-  --c-achieve: #d99a00;
-  --c-travel: #1a8aa8;
-  --c-exp: #7a4fd6;
-  --c-skill: #2e9b57;
+  --bg: #eef1f4; --paper: #ffffff; --ink: #16212e; --muted: #5d6b7a; --line: #d3dae2;
+  --band: #16212e; --band-fg: #f3f5f8; --band-muted: #9fb0c2;
+  --accent: #ff6a3d; --stamp: #d0381f; --chip: #e3ebf0; --scrim: rgba(10,16,24,.55);
+  --c-thrill: #e0412b; --c-achieve: #d99a00; --c-travel: #1a8aa8; --c-exp: #7a4fd6; --c-skill: #2e9b57;
   --font-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
   --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0d131a; --paper: #172029; --ink: #e8edf2; --muted: #93a2b2;
-    --line: #283544; --band: #070b10; --band-fg: #f3f5f8; --band-muted: #8496a9;
-    --accent: #ff7d55; --stamp: #ff7a5e; --chip: #213040;
+  :root {
+    --bg: #0d131a; --paper: #172029; --ink: #e8edf2; --muted: #93a2b2; --line: #283544;
+    --band: #070b10; --band-fg: #f3f5f8; --band-muted: #8496a9;
+    --accent: #ff7d55; --stamp: #ff7a5e; --chip: #213040; --scrim: rgba(0,0,0,.65);
     --c-thrill: #ff6a52; --c-achieve: #f2b832; --c-travel: #4cb8d4; --c-exp: #a685f0; --c-skill: #52c47e;
     color-scheme: dark;
   }
 }
-:root[data-theme="dark"] {
-  --bg: #0d131a; --paper: #172029; --ink: #e8edf2; --muted: #93a2b2;
-  --line: #283544; --band: #070b10; --band-fg: #f3f5f8; --band-muted: #8496a9;
-  --accent: #ff7d55; --stamp: #ff7a5e; --chip: #213040;
-  --c-thrill: #ff6a52; --c-achieve: #f2b832; --c-travel: #4cb8d4; --c-exp: #a685f0; --c-skill: #52c47e;
-  color-scheme: dark;
-}
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html { padding-top: env(safe-area-inset-top, 0px); background: var(--band); overscroll-behavior-y: none; }
 body {
-  background: var(--bg); color: var(--ink);
+  margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
   font-family: var(--font-body); font-size: 16px; line-height: 1.45;
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  -webkit-tap-highlight-color: transparent;
 }
+body.locked { overflow: hidden; }
 .gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .inner { max-width: 640px; margin: 0 auto; }
+button { font: inherit; cursor: pointer; color: inherit; }
+input, textarea, select { font: inherit; color: var(--ink); }
 
-/* Header band */
-.band { background: var(--band); color: var(--band-fg); padding-block: 28px 30px; position: relative; overflow: hidden; }
+/* Header */
+.band { background: var(--band); color: var(--band-fg); padding-block: 22px 30px; position: relative; overflow: hidden; }
 .band::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 14px;
   background: radial-gradient(circle at 10px 14px, var(--bg) 7px, transparent 7.5px) 0 0 / 20px 14px repeat-x;
 }
-.band .inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.band .inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.band .inner > div:first-child { min-width: 0; }
 .eyebrow { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
-h1 {
-  font-family: var(--font-display); font-weight: 900; text-transform: uppercase; margin: 0;
-  font-size: clamp(3rem, 14vw, 4.8rem); line-height: .84; letter-spacing: .005em;
-}
+h1 { font-family: var(--font-display); font-weight: 900; text-transform: uppercase; margin: 0; font-size: clamp(3rem, 14vw, 4.8rem); line-height: .84; }
 h1 em { font-style: normal; color: var(--accent); }
 .mood { margin: 10px 0 0; color: var(--band-muted); font-size: .95rem; max-width: 30ch; }
-
-.dial { position: relative; width: 116px; height: 116px; flex: none; }
+.dial { position: relative; width: 112px; height: 112px; flex: none; }
 .dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .dial .track { fill: none; stroke: rgba(255,255,255,.12); stroke-width: 10; }
 .dial .prog { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.2,.9,.3,1.2); }
 .dial .val { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
-.dial .val b { font-family: var(--font-display); font-weight: 900; font-size: 2.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.dial .val b { font-family: var(--font-display); font-weight: 900; font-size: 2.1rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .dial .val small { font-family: var(--font-mono); font-size: .62rem; letter-spacing: .1em; color: var(--band-muted); text-transform: uppercase; }
 
-main { padding-block: 26px 0; }
-main .inner { display: flex; flex-direction: column; gap: 18px; }
+/* View switcher */
+.views { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--chip); border-radius: 12px; padding: 4px; gap: 4px; }
+.views button { border: 0; background: none; border-radius: 9px; padding: 9px 6px; font-weight: 700; font-size: .92rem; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; }
+.views button svg { width: 17px; height: 17px; }
+.views button[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
 
+main { padding-block: 22px 0; }
+main .inner { display: flex; flex-direction: column; gap: 18px; }
+.view { display: flex; flex-direction: column; gap: 18px; }
+
+/* Add bar */
 form.add { display: flex; gap: 8px; flex-wrap: wrap; background: var(--paper); border: 2px solid var(--line); border-radius: 14px; padding: 8px; transition: border-color .2s; }
 form.add:focus-within { border-color: var(--accent); }
-form.add input {
-  flex: 1 1 200px; min-width: 0; border: 0; background: transparent; color: var(--ink);
-  font: inherit; font-size: 1.05rem; padding: 10px 8px;
-}
+form.add input { flex: 1 1 180px; min-width: 0; border: 0; background: transparent; font-size: 1.05rem; padding: 10px 8px; }
 form.add input:focus { outline: none; }
-form.add select { font: inherit; font-size: .9rem; color: var(--ink); background: var(--chip); border: 0; border-radius: 8px; padding: 8px 10px; }
-button { font: inherit; cursor: pointer; }
-.btn-add { background: var(--accent); color: #fff; border: 0; border-radius: 9px; padding: 10px 20px; font-weight: 700; }
+form.add select { font-size: .9rem; background: var(--chip); border: 0; border-radius: 8px; padding: 8px 10px; }
+.btn-add { background: var(--accent); color: #fff; border: 0; border-radius: 9px; padding: 10px 18px; font-weight: 700; }
 .btn-add:disabled { opacity: .4; cursor: default; }
+.btn-idea { background: var(--chip); border: 0; border-radius: 9px; padding: 8px 12px; font-weight: 700; font-size: .88rem; display: inline-flex; align-items: center; gap: 6px; }
+.btn-idea svg { width: 18px; height: 18px; }
+.btn-idea:active, .surprise:active { transform: scale(.96); }
 
 .toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
 .tabs { display: flex; gap: 2px; }
-.tabs button {
-  background: none; border: 0; color: var(--muted); padding: 8px 12px 10px;
-  font-weight: 700; font-size: .9rem; border-bottom: 3px solid transparent; margin-bottom: -1px;
-}
+.tabs button { background: none; border: 0; color: var(--muted); padding: 8px 12px 10px; font-weight: 700; font-size: .9rem; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
 .tabs .n { font-family: var(--font-mono); font-size: .72rem; margin-left: 4px; opacity: .7; }
-.surprise {
-  background: var(--ink); color: var(--bg); border: 0; border-radius: 999px; padding: 7px 14px;
-  font-weight: 700; font-size: .85rem; margin-bottom: 8px; display: inline-flex; gap: 6px; align-items: center;
-}
+.surprise { background: var(--ink); color: var(--bg); border: 0; border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: .85rem; margin-bottom: 8px; display: inline-flex; gap: 6px; align-items: center; }
 .surprise svg { width: 16px; height: 16px; }
-.surprise:active { transform: scale(.96); }
 
 .cats { display: flex; gap: 6px; flex-wrap: wrap; }
-.cats button {
-  border: 1.5px solid var(--line); background: var(--paper); color: var(--muted);
-  border-radius: 999px; padding: 4px 11px; font-size: .78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
-}
-.cats button .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
-.cats button[aria-pressed="true"] { border-color: var(--c, var(--ink)); color: var(--ink); background: var(--chip); }
+.cats button { border: 1.5px solid var(--line); background: var(--paper); color: var(--muted); border-radius: 999px; padding: 4px 11px; font-size: .78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.cats .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.cats button[aria-pressed="true"] { border-color: var(--c); color: var(--ink); background: var(--chip); }
+.hint { color: var(--muted); font-size: .8rem; margin: -6px 0 0; }
 
+/* Cards */
 ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 li.item {
   --c: var(--c-exp);
   position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
-  background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 12px 14px 14px;
-  overflow: hidden; transition: transform .2s ease, box-shadow .2s ease;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 10px 14px 14px;
+  overflow: hidden; transition: transform .2s ease, box-shadow .2s ease; cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 li.item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--c); }
 li.item::after { content: ""; position: absolute; left: 58px; top: 10px; bottom: 10px; border-left: 2px dotted var(--line); }
+li.item.pressing { transform: scale(.98); box-shadow: 0 0 0 2px var(--c); }
 li.item.picked { box-shadow: 0 0 0 3px var(--c); transform: scale(1.015); }
 li.item.picked .title { color: var(--c); }
-.tick {
-  width: 32px; height: 32px; border-radius: 50%; border: 2.5px solid var(--c);
-  background: transparent; display: grid; place-items: center; color: #fff; padding: 0;
-  transition: background .2s, transform .15s;
-}
+.tick { width: 32px; height: 32px; border-radius: 50%; border: 2.5px solid var(--c); background: transparent; display: grid; place-items: center; color: #fff; padding: 0; transition: background .2s, transform .15s; position: relative; z-index: 1; }
 .tick:hover { transform: scale(1.1); }
 .done .tick { background: var(--c); }
 .tick svg { width: 17px; height: 17px; opacity: 0; }
@@ -147,54 +129,140 @@ li.item.picked .title { color: var(--c); }
 .body { min-width: 0; padding-left: 12px; display: flex; flex-direction: column; gap: 4px; }
 .title { font-weight: 700; font-size: 1.06rem; overflow-wrap: anywhere; }
 .done .title { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1.5px; }
-.meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .chip { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--c); }
 .date { font-family: var(--font-mono); font-size: .72rem; color: var(--muted); }
+.flags { display: inline-flex; gap: 6px; color: var(--muted); }
+.flags svg { width: 14px; height: 14px; }
+.flags .place { font-size: .75rem; display: inline-flex; gap: 3px; align-items: center; max-width: 16ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.right { display: flex; align-items: center; gap: 4px; }
+.thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: var(--chip); }
 .stamp {
-  position: absolute; right: 52px; top: 50%; transform: translateY(-50%) rotate(-10deg);
-  font-family: var(--font-display); font-weight: 900; font-size: 1.35rem; letter-spacing: .1em;
-  color: var(--stamp); border: 3px solid var(--stamp); border-radius: 6px; padding: 0 8px;
-  opacity: .85; pointer-events: none; mix-blend-mode: multiply;
+  position: absolute; right: 64px; top: 50%; transform: translateY(-50%) rotate(-10deg);
+  font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; letter-spacing: .1em;
+  color: var(--stamp); border: 3px solid var(--stamp); border-radius: 6px; padding: 0 8px; opacity: .85; pointer-events: none;
 }
-:root[data-theme="dark"] .stamp { mix-blend-mode: normal; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stamp { mix-blend-mode: normal; } }
+.has-thumb .stamp { right: 110px; }
 .stamp.slam { animation: slam .45s cubic-bezier(.2,1.6,.4,1) both; }
-@keyframes slam {
-  0% { transform: translateY(-50%) rotate(-24deg) scale(2.6); opacity: 0; }
-  60% { opacity: .95; }
-  100% { transform: translateY(-50%) rotate(-10deg) scale(1); opacity: .85; }
-}
-.del { background: none; border: 0; color: var(--muted); width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; }
+@keyframes slam { 0% { transform: translateY(-50%) rotate(-24deg) scale(2.6); opacity: 0; } 60% { opacity: .95; } 100% { transform: translateY(-50%) rotate(-10deg) scale(1); opacity: .85; } }
+.del { background: none; border: 0; color: var(--muted); width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; position: relative; z-index: 1; }
 .del:hover { background: var(--chip); color: var(--stamp); }
 .del svg { width: 18px; height: 18px; }
-
 .empty { text-align: center; color: var(--muted); padding: 36px 16px; border: 2px dashed var(--line); border-radius: 12px; }
 .empty b { display: block; font-family: var(--font-display); font-size: 1.7rem; text-transform: uppercase; color: var(--ink); }
 
-.toast {
-  position: fixed; left: 50%; transform: translateX(-50%); z-index: 20;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 10px 10px 16px;
-  display: flex; gap: 14px; align-items: center; font-size: .92rem; font-weight: 600; max-width: calc(100% - 32px);
-  box-shadow: 0 8px 28px rgba(0,0,0,.3);
-}
-.toast button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 4px 8px; }
-.toast button[hidden] { display: none; }
-.note { color: var(--muted); font-size: .8rem; text-align: center; }
-canvas#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 15; }
+/* Map */
+#map { height: min(62vh, 560px); border-radius: 14px; border: 1px solid var(--line); background: var(--chip); z-index: 0; }
+.map-note { color: var(--muted); font-size: .85rem; margin: 0; }
+.pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); background: var(--c); border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); display: grid; place-items: center; }
+.pin svg { transform: rotate(45deg); width: 14px; height: 14px; color: #fff; }
+.pin.todo { background: #fff; border-color: var(--c); }
+.pin.todo::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.leaflet-popup-content { margin: 12px 14px; font-family: var(--font-body); }
+.pop b { display: block; font-size: 1rem; margin-bottom: 2px; }
+.pop small { color: #5d6b7a; display: block; margin-bottom: 8px; }
+.pop button { background: #16212e; color: #fff; border: 0; border-radius: 8px; padding: 6px 12px; font-weight: 700; font-size: .85rem; }
+.leaflet-container a.leaflet-popup-close-button { padding: 6px 6px 0 0; }
 
-button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (max-width: 440px) {
-  .dial { width: 96px; height: 96px; }
-  .dial .val b { font-size: 1.8rem; }
-  .stamp { right: 48px; font-size: 1.1rem; }
+/* Stats */
+.stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.stat .k { font-family: var(--font-mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-family: var(--font-display); font-weight: 900; font-size: 2.4rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 1.1rem; color: var(--muted); font-weight: 800; }
+.stat .s { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+.stat.wide { grid-column: 1 / -1; }
+.stat.hero { background: var(--band); color: var(--band-fg); border-color: var(--band); }
+.stat.hero .k { color: var(--accent); }
+.stat.hero .s { color: var(--band-muted); }
+.stat.hero .v { font-size: 1.6rem; line-height: 1.1; }
+.bars { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.bar-row { display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: center; font-size: .85rem; }
+.bar-row .lbl { font-weight: 700; color: var(--c); }
+.bar-row .trk { height: 10px; border-radius: 5px; background: var(--chip); overflow: hidden; }
+.bar-row .fill { height: 100%; background: var(--c); border-radius: 5px; transition: width .6s ease; }
+.bar-row .num { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.year { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; align-items: end; height: 70px; margin-top: 8px; }
+.year div { background: var(--chip); border-radius: 3px 3px 0 0; min-height: 3px; position: relative; }
+.year div.on { background: var(--accent); }
+.year-lbl { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; font-family: var(--font-mono); font-size: .6rem; color: var(--muted); text-align: center; }
+.backup { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-ghost { background: var(--paper); border: 1.5px solid var(--line); border-radius: 9px; padding: 9px 14px; font-weight: 700; font-size: .88rem; }
+
+/* Sheet */
+.scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 30; animation: fade .2s ease; }
+@keyframes fade { from { opacity: 0; } }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-height: 92vh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--bg); border-radius: 18px 18px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.3);
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); animation: up .28s cubic-bezier(.2,.9,.3,1);
 }
-@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
-</style>
-<style>
-html { padding-top: env(safe-area-inset-top, 0px); background: var(--band); }
-body { margin: 0; min-height: 100vh; }
-html, body { overscroll-behavior-y: none; }
+@keyframes up { from { transform: translateY(40px); opacity: 0; } }
+.sheet .inner { display: flex; flex-direction: column; gap: 16px; }
+.sheet-head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.sheet-head .inner { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 8px; }
+.sheet-head .cat-pill { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--c); }
+.btn-close { background: var(--chip); border: 0; border-radius: 999px; padding: 7px 16px; font-weight: 700; }
+.sheet-body { padding-block: 16px 0; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label, .field > .lab { font-family: var(--font-mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.title-in { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; line-height: 1.05; text-transform: uppercase; border: 0; border-bottom: 2px solid var(--line); background: transparent; padding: 4px 0 6px; width: 100%; resize: none; }
+.title-in:focus { outline: none; border-bottom-color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.catpick { display: flex; gap: 6px; flex-wrap: wrap; }
+.catpick button { --c: var(--muted); border: 1.5px solid var(--line); background: var(--paper); border-radius: 999px; padding: 5px 12px; font-size: .8rem; font-weight: 700; color: var(--muted); }
+.catpick button[aria-pressed="true"] { border-color: var(--c); background: var(--c); color: #fff; }
+.donebtn { border: 2px solid var(--c); background: var(--paper); color: var(--ink); border-radius: 12px; padding: 12px 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; width: 100%; justify-content: center; font-size: 1rem; }
+.donebtn.is-done { background: var(--c); color: #fff; }
+.donebtn svg { width: 20px; height: 20px; }
+textarea.notes, .txt { width: 100%; background: var(--paper); border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 1rem; }
+textarea.notes { min-height: 96px; resize: vertical; }
+textarea.notes:focus, .txt:focus { outline: none; border-color: var(--accent); }
+.links { display: flex; flex-direction: column; gap: 6px; }
+.link-row { display: flex; align-items: center; gap: 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 8px 8px 8px 12px; min-width: 0; }
+.link-row a { color: var(--c-travel); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x { background: none; border: 0; color: var(--muted); width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+.x:hover { background: var(--chip); color: var(--stamp); }
+.x svg { width: 16px; height: 16px; }
+.addrow { display: flex; gap: 8px; }
+.addrow .txt { flex: 1; min-width: 0; }
+.btn-sm { background: var(--ink); color: var(--bg); border: 0; border-radius: 9px; padding: 8px 14px; font-weight: 700; font-size: .88rem; flex: none; }
+.btn-sm.alt { background: var(--chip); color: var(--ink); }
+.photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.ph { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--chip); max-width: 100%; }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph .x { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.55); color: #fff; width: 26px; height: 26px; }
+.ph-add { aspect-ratio: 1; border-radius: 10px; border: 2px dashed var(--line); background: none; display: grid; place-content: center; justify-items: center; gap: 4px; color: var(--muted); font-size: .78rem; font-weight: 700; }
+.ph-add svg { width: 24px; height: 24px; }
+.loc-card { display: flex; align-items: center; gap: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 10px 8px 10px 12px; }
+.loc-card svg { width: 20px; height: 20px; color: var(--c-travel); flex: none; }
+.loc-card span { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.results { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--paper); }
+.results button { text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 10px 12px; font-size: .9rem; }
+.results button:first-child { border-top: 0; }
+.results button:hover { background: var(--chip); }
+.small { font-size: .8rem; color: var(--muted); }
+.danger { background: none; border: 0; color: var(--stamp); font-weight: 700; padding: 10px; align-self: center; }
+
+/* Lightbox */
+.lightbox { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.92); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) 16px; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); z-index: 50; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 10px 10px 16px; display: flex; gap: 14px; align-items: center; font-size: .92rem; font-weight: 600; max-width: calc(100% - 32px); box-shadow: 0 8px 28px rgba(0,0,0,.3); }
+.toast button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 4px 8px; flex: none; }
+canvas#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 45; }
+
+button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 440px) {
+  .dial { width: 92px; height: 92px; }
+  .dial .val b { font-size: 1.7rem; }
+  .stamp { font-size: 1.05rem; right: 56px; }
+  .has-thumb .stamp { right: 100px; }
+  .bar-row { grid-template-columns: 84px 1fr auto; }
+  .stat .v { font-size: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
@@ -215,145 +283,300 @@ html, body { overscroll-behavior-y: none; }
 
 <main class="gutter">
   <div class="inner">
-    <form class="add" id="addForm" autocomplete="off">
-      <input id="newTitle" type="text" placeholder="Add a goal… e.g. Swim with sharks" maxlength="140" aria-label="New bucket list goal">
-      <select id="newCat" aria-label="Category">
-        <option value="Experience">Experience</option>
-        <option value="Thrill">Thrill</option>
-        <option value="Achievement">Achievement</option>
-        <option value="Travel">Travel</option>
-        <option value="Skill">Skill</option>
-      </select>
-      <button class="btn-add" id="addBtn" type="submit" disabled>Add</button>
-    </form>
+    <nav class="views" role="tablist" aria-label="Views">
+      <button role="tab" data-v="list" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg>List</button>
+      <button role="tab" data-v="map" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Map</button>
+      <button role="tab" data-v="stats" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 20V12M12 20V5M19 20v-9"/></svg>Stats</button>
+    </nav>
 
-    <div class="toolbar">
-      <div class="tabs" role="tablist">
-        <button role="tab" data-f="todo" aria-selected="true">To do<span class="n" id="nTodo">0</span></button>
-        <button role="tab" data-f="done" aria-selected="false">Done<span class="n" id="nDone">0</span></button>
-        <button role="tab" data-f="all" aria-selected="false">All<span class="n" id="nAll">0</span></button>
+    <!-- LIST -->
+    <section class="view" id="view-list">
+      <form class="add" id="addForm" autocomplete="off">
+        <input id="newTitle" type="text" placeholder="Add a goal… e.g. Swim with sharks" maxlength="140" aria-label="New bucket list goal">
+        <select id="newCat" aria-label="Category">
+          <option value="Experience">Experience</option><option value="Thrill">Thrill</option><option value="Achievement">Achievement</option><option value="Travel">Travel</option><option value="Skill">Skill</option>
+        </select>
+        <button class="btn-idea" id="ideaBtn" type="button" title="Add a random idea"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0012 3z"/></svg>Idea</button>
+        <button class="btn-add" id="addBtn" type="submit" disabled>Add</button>
+      </form>
+
+      <div class="toolbar">
+        <div class="tabs" role="tablist">
+          <button role="tab" data-f="todo" aria-selected="true">To do<span class="n" id="nTodo">0</span></button>
+          <button role="tab" data-f="done" aria-selected="false">Done<span class="n" id="nDone">0</span></button>
+          <button role="tab" data-f="all" aria-selected="false">All<span class="n" id="nAll">0</span></button>
+        </div>
+        <button class="surprise" id="surprise" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>Surprise me</button>
       </div>
-      <button class="surprise" id="surprise" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
-        Surprise me
-      </button>
-    </div>
+      <div class="cats" id="cats"></div>
+      <p class="hint">Tap a goal to add notes, photos, links or a place. Hold it to rename.</p>
+      <ul class="list" id="list"></ul>
+      <div class="empty" id="empty" hidden></div>
+    </section>
 
-    <div class="cats" id="cats"></div>
+    <!-- MAP -->
+    <section class="view" id="view-map" hidden>
+      <div id="map" role="region" aria-label="Map of goals"></div>
+      <p class="map-note" id="mapNote"></p>
+    </section>
 
-    <ul class="list" id="list"></ul>
-    <div class="empty" id="empty" hidden></div>
-    <p class="note" id="note" hidden></p>
+    <!-- STATS -->
+    <section class="view" id="view-stats" hidden>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="stat wide">
+        <span class="k">By category</span>
+        <div class="bars" id="catBars"></div>
+      </div>
+      <div class="stat wide">
+        <span class="k" id="yearLabel">Ticked off this year</span>
+        <div class="year" id="yearBars"></div>
+        <div class="year-lbl"><span>J</span><span>F</span><span>M</span><span>A</span><span>M</span><span>J</span><span>J</span><span>A</span><span>S</span><span>O</span><span>N</span><span>D</span></div>
+      </div>
+      <div class="stat wide">
+        <span class="k">Back up</span>
+        <p class="s">Your list lives on this device only. Save a backup file now and then, and restore it on a new phone.</p>
+        <div class="backup">
+          <button class="btn-ghost" id="exportBtn" type="button">Save backup</button>
+          <button class="btn-ghost" id="importBtn" type="button">Restore backup</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+        </div>
+      </div>
+    </section>
   </div>
 </main>
-<canvas id="fx" aria-hidden="true"></canvas>
-<div class="toast" id="toast" hidden role="status"><span id="toastMsg"></span><button id="undoBtn" type="button">Undo</button></div>
 
+<!-- Detail sheet -->
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="sheet-head gutter">
+    <div class="grab"></div>
+    <div class="inner"><span class="cat-pill" id="dCatPill"></span><button class="btn-close" id="dClose" type="button">Done</button></div>
+  </div>
+  <div class="sheet-body gutter">
+    <div class="inner">
+      <div class="field">
+        <label for="dTitle">Goal</label>
+        <textarea class="title-in" id="dTitle" rows="1" maxlength="140"></textarea>
+      </div>
+      <div class="catpick" id="dCats"></div>
+      <button class="donebtn" id="dDone" type="button"></button>
+
+      <div class="field">
+        <label for="dNotes">Notes</label>
+        <textarea class="notes" id="dNotes" placeholder="Plans, who to go with, how it went…"></textarea>
+      </div>
+
+      <div class="field">
+        <span class="lab">Photos</span>
+        <div class="photos" id="dPhotos"></div>
+        <input type="file" id="dPhotoFile" accept="image/*" multiple hidden>
+      </div>
+
+      <div class="field">
+        <span class="lab">Place</span>
+        <div id="dLocCard"></div>
+        <form class="addrow" id="dLocForm" autocomplete="off">
+          <input class="txt" id="dLocQ" type="search" placeholder="Search for a place, e.g. Tromsø">
+          <button class="btn-sm" type="submit">Search</button>
+        </form>
+        <div class="row"><button class="btn-sm alt" id="dHere" type="button">Use my location</button><span class="small" id="dLocMsg"></span></div>
+        <div class="results" id="dResults" hidden></div>
+      </div>
+
+      <div class="field">
+        <span class="lab">Links</span>
+        <div class="links" id="dLinks"></div>
+        <form class="addrow" id="dLinkForm" autocomplete="off">
+          <input class="txt" id="dLinkIn" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="Paste a link (tickets, guides…)">
+          <button class="btn-sm" type="submit">Add</button>
+        </form>
+      </div>
+
+      <p class="small" id="dCreated"></p>
+      <button class="danger" id="dDelete" type="button">Delete this goal</button>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" hidden><img id="lbImg" alt=""></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="toast" id="toast" hidden role="status"><span id="toastMsg"></span><button id="toastBtn" type="button">Undo</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function () {
+  "use strict";
   const $ = (id) => document.getElementById(id);
   const CATS = [
-    { k: "Thrill", c: "--c-thrill" },
-    { k: "Achievement", c: "--c-achieve" },
-    { k: "Travel", c: "--c-travel" },
-    { k: "Experience", c: "--c-exp" },
-    { k: "Skill", c: "--c-skill" },
+    { k: "Thrill", c: "--c-thrill" }, { k: "Achievement", c: "--c-achieve" }, { k: "Travel", c: "--c-travel" },
+    { k: "Experience", c: "--c-exp" }, { k: "Skill", c: "--c-skill" },
   ];
   const catVar = (k) => (CATS.find(x => x.k === k) || CATS[3]).c;
-  const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const catColor = (k) => getComputedStyle(document.documentElement).getPropertyValue(catVar(k)).trim();
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const LS = "bucket-list-items";
+  const DAY = 86400000;
+
+  const SEED = [{"id": "s0", "title": "Shoot a gun", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759600000}, {"id": "s1", "title": "Win on a game show", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599999}, {"id": "s2", "title": "Get a Guinness World Record", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599998}, {"id": "s3", "title": "Go skydiving", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599997}, {"id": "s4", "title": "Do a bungee jump", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599996}, {"id": "s5", "title": "Swim with sharks", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599995}, {"id": "s6", "title": "See the Northern Lights", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599994}, {"id": "s7", "title": "Drive Route 66", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599993}, {"id": "s8", "title": "Visit Japan", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599992}, {"id": "s9", "title": "See one of the Seven Wonders of the World", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599991}, {"id": "s10", "title": "Run a marathon", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599990}, {"id": "s11", "title": "Climb Ben Nevis", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599989}, {"id": "s12", "title": "Watch a cup final at Wembley", "category": "Experience", "done": false, "doneAt": null, "createdAt": 1792759599988}, {"id": "s13", "title": "Take a hot air balloon ride", "category": "Experience", "done": false, "doneAt": null, "createdAt": 1792759599987}, {"id": "s14", "title": "Sleep under the stars", "category": "Experience", "done": false, "doneAt": null, "createdAt": 1792759599986}, {"id": "s15", "title": "Drive a supercar on a track", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599985}, {"id": "s16", "title": "Learn to play an instrument", "category": "Skill", "done": false, "doneAt": null, "createdAt": 1792759599984}, {"id": "s17", "title": "Learn a new language", "category": "Skill", "done": false, "doneAt": null, "createdAt": 1792759599983}, {"id": "s18", "title": "Do a stand-up comedy set", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599982}];
+  const IDEAS = [{"t": "Go scuba diving", "c": "Thrill"}, {"t": "Ride a zip line", "c": "Thrill"}, {"t": "Go white-water rafting", "c": "Thrill"}, {"t": "Walk on hot coals", "c": "Thrill"}, {"t": "Try indoor skydiving", "c": "Thrill"}, {"t": "Hang-glide", "c": "Thrill"}, {"t": "Go paragliding", "c": "Thrill"}, {"t": "Throw an axe", "c": "Thrill"}, {"t": "Ride a mechanical bull", "c": "Thrill"}, {"t": "Do the polar bear plunge", "c": "Thrill"}, {"t": "Ride one of the world's biggest rollercoasters", "c": "Thrill"}, {"t": "Drive a speedboat", "c": "Thrill"}, {"t": "Fly in a helicopter", "c": "Thrill"}, {"t": "Go cliff jumping", "c": "Thrill"}, {"t": "Swim with dolphins", "c": "Thrill"}, {"t": "Go zorbing", "c": "Thrill"}, {"t": "Try flyboarding", "c": "Thrill"}, {"t": "Explore a cave", "c": "Thrill"}, {"t": "Abseil down a waterfall", "c": "Thrill"}, {"t": "Shoot clay pigeons", "c": "Thrill"}, {"t": "Go off-roading in a 4x4", "c": "Thrill"}, {"t": "Race go-karts", "c": "Thrill"}, {"t": "Learn to surf", "c": "Skill"}, {"t": "Learn to juggle", "c": "Skill"}, {"t": "Solve a Rubik's Cube", "c": "Skill"}, {"t": "Learn CPR", "c": "Skill"}, {"t": "Learn to play chess properly", "c": "Skill"}, {"t": "Make fresh pasta from scratch", "c": "Skill"}, {"t": "Learn to make sushi", "c": "Skill"}, {"t": "Take a pottery class", "c": "Skill"}, {"t": "Learn to whistle with two fingers", "c": "Skill"}, {"t": "Start a fire without matches", "c": "Skill"}, {"t": "Write a song", "c": "Skill"}, {"t": "Learn a magic trick", "c": "Skill"}, {"t": "Learn to ice skate backwards", "c": "Skill"}, {"t": "Learn to sail", "c": "Skill"}, {"t": "Run a 10K", "c": "Achievement"}, {"t": "Run a half marathon", "c": "Achievement"}, {"t": "Get a hole in one", "c": "Achievement"}, {"t": "Bowl a turkey (three strikes in a row)", "c": "Achievement"}, {"t": "Write a book", "c": "Achievement"}, {"t": "Get a standing ovation", "c": "Achievement"}, {"t": "Give a talk to a big audience", "c": "Achievement"}, {"t": "Win a pub quiz", "c": "Achievement"}, {"t": "Do the Three Peaks Challenge", "c": "Achievement"}, {"t": "Swim a mile in open water", "c": "Achievement"}, {"t": "Climb a volcano", "c": "Achievement"}, {"t": "Hit the bullseye in archery", "c": "Achievement"}, {"t": "Do 100 press-ups in one go", "c": "Achievement"}, {"t": "Be an extra in a film", "c": "Experience"}, {"t": "Be in a TV studio audience", "c": "Experience"}, {"t": "Sleep in a treehouse", "c": "Experience"}, {"t": "Sleep in an igloo", "c": "Experience"}, {"t": "Eat at a Michelin-starred restaurant", "c": "Experience"}, {"t": "Drink at an ice bar", "c": "Experience"}, {"t": "Ride a camel", "c": "Experience"}, {"t": "Fly first class", "c": "Experience"}, {"t": "See a total solar eclipse", "c": "Experience"}, {"t": "Go whale watching", "c": "Experience"}, {"t": "Find a four-leaf clover", "c": "Experience"}, {"t": "Send a message in a bottle", "c": "Experience"}, {"t": "Win a cuddly toy at the fair", "c": "Experience"}, {"t": "Saber a bottle of champagne", "c": "Experience"}, {"t": "Stay up to watch the sunrise and sunset in one day", "c": "Experience"}, {"t": "Go to a murder mystery dinner", "c": "Experience"}, {"t": "Do an escape room", "c": "Experience"}, {"t": "Sing karaoke in public", "c": "Experience"}, {"t": "Crowd-surf at a gig", "c": "Experience"}, {"t": "See your favourite band live", "c": "Experience"}, {"t": "Go to the Olympics", "c": "Experience"}, {"t": "Watch a Wimbledon match on Centre Court", "c": "Experience"}, {"t": "Plant a tree", "c": "Experience"}, {"t": "Give blood", "c": "Experience"}, {"t": "Go on a cruise", "c": "Experience"}, {"t": "Write a letter to your future self", "c": "Experience"}, {"t": "Have a white Christmas", "c": "Experience"}, {"t": "Ride the Orient Express", "c": "Travel"}, {"t": "Visit all seven continents", "c": "Travel"}, {"t": "Take a sleeper train", "c": "Travel"}, {"t": "Go on an African safari", "c": "Travel"}, {"t": "See the Northern Lights in Norway", "c": "Travel", "l": [69.6492, 18.9553, "Tromsø, Norway"]}, {"t": "Walk the Great Wall of China", "c": "Travel", "l": [40.4319, 116.5704, "Mutianyu, China"]}, {"t": "Hike to Machu Picchu", "c": "Travel", "l": [-13.1631, -72.545, "Machu Picchu, Peru"]}, {"t": "Stand in front of the Taj Mahal", "c": "Travel", "l": [27.1751, 78.0421, "Agra, India"]}, {"t": "See the Pyramids of Giza", "c": "Travel", "l": [29.9792, 31.1342, "Giza, Egypt"]}, {"t": "Look out over the Grand Canyon", "c": "Travel", "l": [36.0544, -112.1401, "Grand Canyon, USA"]}, {"t": "Soak in the Blue Lagoon", "c": "Travel", "l": [63.8804, -22.4495, "Grindavík, Iceland"]}, {"t": "Explore Petra", "c": "Travel", "l": [30.3285, 35.4444, "Petra, Jordan"]}, {"t": "Climb Mount Fuji", "c": "Achievement", "l": [35.3606, 138.7274, "Mount Fuji, Japan"]}, {"t": "Snorkel the Great Barrier Reef", "c": "Travel", "l": [-16.9186, 145.7781, "Cairns, Australia"]}, {"t": "Drink beer at Oktoberfest", "c": "Experience", "l": [48.1315, 11.5497, "Munich, Germany"]}, {"t": "Go to the Edinburgh Fringe", "c": "Experience", "l": [55.9533, -3.1883, "Edinburgh, Scotland"]}, {"t": "Walk the Giant's Causeway", "c": "Travel", "l": [55.2408, -6.5116, "County Antrim, Northern Ireland"]}, {"t": "Visit Stonehenge at sunrise", "c": "Travel", "l": [51.1789, -1.8262, "Wiltshire, England"]}, {"t": "Take a hot air balloon over Cappadocia", "c": "Thrill", "l": [38.6431, 34.8289, "Cappadocia, Turkey"]}, {"t": "Ride a gondola in Venice", "c": "Travel", "l": [45.4408, 12.3155, "Venice, Italy"]}, {"t": "See Iguazú Falls", "c": "Travel", "l": [-25.6953, -54.4367, "Iguazú, Argentina/Brazil"]}, {"t": "Cruise through Ha Long Bay", "c": "Travel", "l": [20.9101, 107.1839, "Ha Long Bay, Vietnam"]}, {"t": "Watch the sunset in Santorini", "c": "Travel", "l": [36.4618, 25.3753, "Oia, Santorini, Greece"]}, {"t": "Climb Mount Kilimanjaro", "c": "Achievement", "l": [-3.0674, 37.3556, "Kilimanjaro, Tanzania"]}, {"t": "See the wildebeest migration in the Serengeti", "c": "Travel", "l": [-2.3333, 34.8333, "Serengeti, Tanzania"]}, {"t": "See Niagara Falls", "c": "Travel", "l": [43.0828, -79.0742, "Niagara Falls, Canada/USA"]}, {"t": "Release a lantern at Yi Peng", "c": "Experience", "l": [18.7883, 98.9853, "Chiang Mai, Thailand"]}, {"t": "Walk on a glacier in New Zealand", "c": "Thrill", "l": [-43.4667, 170.1833, "Franz Josef, New Zealand"]}, {"t": "Pull a pint at the Guinness Storehouse", "c": "Experience", "l": [53.3419, -6.2867, "Dublin, Ireland"]}, {"t": "Float in the Dead Sea", "c": "Travel", "l": [31.559, 35.4732, "Dead Sea, Jordan"]}, {"t": "Join the tomato fight at La Tomatina", "c": "Experience", "l": [39.4206, -0.7911, "Buñol, Spain"]}, {"t": "See La Sagrada Família", "c": "Travel", "l": [41.4036, 2.1744, "Barcelona, Spain"]}, {"t": "Make a wish in the Trevi Fountain", "c": "Travel", "l": [41.9009, 12.4833, "Rome, Italy"]}, {"t": "Bring in New Year at Hogmanay", "c": "Experience", "l": [55.9533, -3.1883, "Edinburgh, Scotland"]}, {"t": "Stay in a glass igloo under the stars", "c": "Experience", "l": [68.44, 27.41, "Saariselkä, Finland"]}, {"t": "Walk across Abbey Road", "c": "Experience", "l": [51.532, -0.178, "London, England"]}, {"t": "Watch the Monaco Grand Prix", "c": "Experience", "l": [43.7347, 7.4206, "Monaco"]}, {"t": "See a match at the Camp Nou", "c": "Experience", "l": [41.3809, 2.1228, "Barcelona, Spain"]}, {"t": "Drive the Pacific Coast Highway", "c": "Travel", "l": [36.2704, -121.8081, "Big Sur, California, USA"]}, {"t": "See Times Square on New Year's Eve", "c": "Experience", "l": [40.758, -73.9855, "New York, USA"]}, {"t": "Go to the Kentucky Derby", "c": "Experience", "l": [38.2034, -85.7704, "Louisville, USA"]}, {"t": "Visit Lake Bled", "c": "Travel", "l": [46.3625, 14.0936, "Bled, Slovenia"]}, {"t": "Hike the Cinque Terre trail", "c": "Achievement", "l": [44.127, 9.709, "Cinque Terre, Italy"]}, {"t": "Ski in the Swiss Alps", "c": "Thrill", "l": [46.0207, 7.7491, "Zermatt, Switzerland"]}];
+
+  const ICON = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    bin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+    note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>',
+    cam: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  };
 
   let items = [];
-  let filter = "todo", catFilter = null;
-  let db = null, col = null, loaded = false;
-  let lastDeleted = null, toastTimer = null, justDone = null, pickedId = null;
-  const LS = "bucket-list-items";
+  let view = "list", filter = "todo", catFilter = null;
+  let toastTimer = null, toastAction = null, justDone = null, pickedId = null;
+  let openId = null;
 
-  const checkSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-  const binSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+  // ---------- storage ----------
+  function save() { try { localStorage.setItem(LS, JSON.stringify(items)); } catch (e) { toast("Couldn't save. Your phone may be out of storage."); } }
+  function load() {
+    let raw = null; try { raw = localStorage.getItem(LS); } catch (e) {}
+    if (raw === null) { items = SEED.map(x => ({ ...x })); save(); return; }
+    try { items = JSON.parse(raw) || []; } catch (e) { items = []; }
+  }
+  const norm = (it) => { it.links = it.links || []; it.photos = it.photos || []; it.notes = it.notes || ""; it.loc = it.loc || null; return it; };
 
+  // Photos live in IndexedDB (too big for localStorage)
+  let idb = null;
+  function openDb() {
+    return new Promise((res) => {
+      try {
+        const r = indexedDB.open("bucket-list", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("photos");
+        r.onsuccess = () => { idb = r.result; res(idb); };
+        r.onerror = () => res(null);
+      } catch (e) { res(null); }
+    });
+  }
+  function idbOp(mode, fn) {
+    return new Promise((res, rej) => {
+      if (!idb) return rej(new Error("no db"));
+      const tx = idb.transaction("photos", mode); const st = tx.objectStore("photos");
+      const r = fn(st); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error);
+    });
+  }
+  const putPhoto = (id, blob) => idbOp("readwrite", s => s.put(blob, id));
+  const getPhoto = (id) => idbOp("readonly", s => s.get(id));
+  const delPhoto = (id) => idbOp("readwrite", s => s.delete(id)).catch(() => {});
+  const urlCache = new Map();
+  async function photoUrl(id) {
+    if (urlCache.has(id)) return urlCache.get(id);
+    try { const b = await getPhoto(id); if (!b) return null; const u = URL.createObjectURL(b); urlCache.set(id, u); return u; } catch (e) { return null; }
+  }
+  function shrink(file, max = 1400) {
+    return new Promise((res, rej) => {
+      const img = new Image(); const u = URL.createObjectURL(file);
+      img.onload = () => {
+        const s = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+        c.toBlob(b => b ? res(b) : rej(new Error("encode")), "image/jpeg", .82);
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); rej(new Error("load")); };
+      img.src = u;
+    });
+  }
+
+  // ---------- helpers ----------
   const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
-  function saveLocal() { if (db) return; try { localStorage.setItem(LS, JSON.stringify(items)); } catch (e) {} }
+  const short = (s, n = 30) => "“" + (s.length > n ? s.slice(0, n) + "…" : s) + "”";
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const byId = (id) => items.find(i => i.id === id);
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
   function moodLine(done, total) {
-    if (!loaded) return "Loading your adventures…";
     if (!total) return "A blank slate. Add the first thing you want to do.";
-    const left = total - done;
+    const left = total - done, p = done / total;
     if (done === 0) return left + " adventures waiting. Pick one and go.";
     if (left === 0) return "Everything ticked off. Legend. Time to dream bigger.";
-    const p = done / total;
     if (p < .25) return "Off the mark with " + done + ". " + left + " still to go.";
     if (p < .5) return "Building momentum: " + done + " down, " + left + " to go.";
     if (p < .75) return "Over halfway there with " + done + " done. Keep going.";
     return "Nearly there. Just " + left + " left.";
   }
 
-  function renderCats() {
-    const wrap = $("cats"); wrap.innerHTML = "";
-    CATS.forEach(cat => {
-      const n = items.filter(i => (i.category || "Experience") === cat.k).length;
-      const b = document.createElement("button");
-      b.type = "button"; b.style.setProperty("--c", "var(" + cat.c + ")");
-      b.setAttribute("aria-pressed", String(catFilter === cat.k));
-      b.innerHTML = '<span class="dot"></span>';
-      b.append(cat.k + " " + n);
-      b.addEventListener("click", () => { catFilter = catFilter === cat.k ? null : cat.k; render(); });
-      wrap.appendChild(b);
-    });
-  }
-
-  function render() {
+  // ---------- render: header ----------
+  function renderHeader() {
     const done = items.filter(i => i.done).length, total = items.length;
-    const pct = total ? Math.round(done / total * 100) : 0;
-    $("pct").textContent = pct + "%";
+    $("pct").textContent = (total ? Math.round(done / total * 100) : 0) + "%";
     $("tally").textContent = done + " of " + total;
     $("ring").style.strokeDashoffset = String(314.16 * (1 - (total ? done / total : 0)));
     $("mood").textContent = moodLine(done, total);
     $("nTodo").textContent = total - done; $("nDone").textContent = done; $("nAll").textContent = total;
-    renderCats();
+  }
 
-    let view = items.slice();
-    if (filter === "todo") view = view.filter(i => !i.done);
-    if (filter === "done") view = view.filter(i => i.done);
-    if (catFilter) view = view.filter(i => (i.category || "Experience") === catFilter);
-    view.sort((a, b) => filter === "done"
-      ? (b.doneAt || 0) - (a.doneAt || 0)
-      : (a.done - b.done) || (b.createdAt || 0) - (a.createdAt || 0));
+  function renderCats() {
+    const wrap = $("cats"); wrap.innerHTML = "";
+    CATS.forEach(cat => {
+      const n = items.filter(i => (i.category || "Experience") === cat.k).length;
+      const b = el("button"); b.type = "button"; b.style.setProperty("--c", "var(" + cat.c + ")");
+      b.setAttribute("aria-pressed", String(catFilter === cat.k));
+      b.appendChild(el("span", "dot")); b.append(cat.k + " " + n);
+      b.addEventListener("click", () => { catFilter = catFilter === cat.k ? null : cat.k; renderList(); });
+      wrap.appendChild(b);
+    });
+  }
+
+  // ---------- render: list ----------
+  function renderList() {
+    renderHeader(); renderCats();
+    let v = items.slice();
+    if (filter === "todo") v = v.filter(i => !i.done);
+    if (filter === "done") v = v.filter(i => i.done);
+    if (catFilter) v = v.filter(i => (i.category || "Experience") === catFilter);
+    v.sort((a, b) => filter === "done" ? (b.doneAt || 0) - (a.doneAt || 0) : (a.done - b.done) || (b.createdAt || 0) - (a.createdAt || 0));
 
     const list = $("list"); list.innerHTML = "";
-    view.forEach(it => {
-      const li = document.createElement("li");
-      li.className = "item" + (it.done ? " done" : "") + (it.id === pickedId ? " picked" : "");
-      li.dataset.id = it.id;
-      li.style.setProperty("--c", "var(" + catVar(it.category) + ")");
-      const tick = document.createElement("button");
-      tick.className = "tick"; tick.type = "button"; tick.innerHTML = checkSvg;
+    v.forEach(it => {
+      norm(it);
+      const li = el("li", "item" + (it.done ? " done" : "") + (it.id === pickedId ? " picked" : "") + (it.photos.length ? " has-thumb" : ""));
+      li.dataset.id = it.id; li.style.setProperty("--c", "var(" + catVar(it.category) + ")");
+      li.tabIndex = 0; li.setAttribute("aria-label", it.title + ". Open details");
+
+      const tick = el("button", "tick"); tick.type = "button"; tick.innerHTML = ICON.check;
       tick.setAttribute("aria-label", it.done ? "Mark " + it.title + " as not done" : "Tick off " + it.title);
-      tick.addEventListener("click", (e) => toggle(it, e));
-      const body = document.createElement("div"); body.className = "body";
-      const t = document.createElement("div"); t.className = "title"; t.textContent = it.title;
-      const meta = document.createElement("div"); meta.className = "meta";
-      const chip = document.createElement("span"); chip.className = "chip"; chip.textContent = it.category || "Experience";
-      meta.appendChild(chip);
-      if (it.done && it.doneAt) { const d = document.createElement("span"); d.className = "date"; d.textContent = "Done " + fmtDate(it.doneAt); meta.appendChild(d); }
-      body.append(t, meta);
-      const del = document.createElement("button");
-      del.className = "del"; del.type = "button"; del.innerHTML = binSvg;
-      del.setAttribute("aria-label", "Delete " + it.title);
-      del.addEventListener("click", () => remove(it));
-      li.append(tick, body, del);
-      if (it.done) {
-        const s = document.createElement("span"); s.className = "stamp" + (justDone === it.id ? " slam" : ""); s.textContent = "DONE";
-        li.appendChild(s);
+      tick.addEventListener("click", (e) => { e.stopPropagation(); toggle(it, e.currentTarget); });
+
+      const body = el("div", "body");
+      body.appendChild(el("div", "title", it.title));
+      const meta = el("div", "meta");
+      meta.appendChild(el("span", "chip", it.category || "Experience"));
+      if (it.done && it.doneAt) meta.appendChild(el("span", "date", "Done " + fmtDate(it.doneAt)));
+      const flags = el("span", "flags");
+      if (it.loc) { const p = el("span", "place"); p.innerHTML = ICON.pin; p.append(it.loc.label.split(",")[0]); flags.appendChild(p); }
+      if (it.notes.trim()) { const s = el("span"); s.innerHTML = ICON.note; s.title = "Has notes"; flags.appendChild(s); }
+      if (it.links.length) { const s = el("span"); s.innerHTML = ICON.link; s.title = "Has links"; flags.appendChild(s); }
+      if (flags.childNodes.length) meta.appendChild(flags);
+      body.appendChild(meta);
+
+      const right = el("div", "right");
+      if (it.photos.length) {
+        const img = el("img", "thumb"); img.alt = ""; right.appendChild(img);
+        photoUrl(it.photos[0]).then(u => { if (u) img.src = u; });
       }
+      const del = el("button", "del"); del.type = "button"; del.innerHTML = ICON.bin; del.setAttribute("aria-label", "Delete " + it.title);
+      del.addEventListener("click", (e) => { e.stopPropagation(); remove(it); });
+      right.appendChild(del);
+
+      li.append(tick, body, right);
+      if (it.done) li.appendChild(el("span", "stamp" + (justDone === it.id ? " slam" : ""), "DONE"));
+      attachPress(li, it);
       list.appendChild(li);
     });
     justDone = null;
 
     const empty = $("empty");
-    if (!loaded) { empty.hidden = false; empty.innerHTML = "<b>Loading your list</b>Your goals will appear here."; }
-    else if (!view.length) {
+    if (!v.length) {
       empty.hidden = false;
-      if (!total) empty.innerHTML = "<b>Nothing on the list yet</b>Type a goal above and press Add.";
+      if (!items.length) empty.innerHTML = "<b>Nothing on the list yet</b>Type a goal above, or tap Idea for inspiration.";
       else if (catFilter) empty.innerHTML = "<b>Nothing here</b>No " + catFilter.toLowerCase() + " goals in this view.";
       else if (filter === "done") empty.innerHTML = "<b>Nothing ticked off yet</b>Tap the circle next to a goal once you've done it.";
       else if (filter === "todo") empty.innerHTML = "<b>All done</b>Every goal ticked off. Time to add more.";
@@ -361,19 +584,92 @@ html, body { overscroll-behavior-y: none; }
     } else empty.hidden = true;
   }
 
-  // ---- confetti ----
-  const fx = $("fx"), ctx = fx.getContext("2d");
-  let parts = [], raf = null;
+  // Tap opens details; hold opens with the name ready to edit
+  function attachPress(li, it) {
+    let timer = null, sx = 0, sy = 0, held = false;
+    const cancel = () => { clearTimeout(timer); timer = null; li.classList.remove("pressing"); };
+    li.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+      held = false; sx = e.clientX; sy = e.clientY; li.classList.add("pressing");
+      timer = setTimeout(() => { held = true; li.classList.remove("pressing"); if (navigator.vibrate) navigator.vibrate(12); openSheet(it.id, true); }, 480);
+    });
+    li.addEventListener("pointermove", (e) => { if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel(); });
+    li.addEventListener("pointerup", cancel); li.addEventListener("pointercancel", cancel); li.addEventListener("pointerleave", cancel);
+    li.addEventListener("contextmenu", (e) => e.preventDefault());
+    li.addEventListener("click", (e) => { if (e.target.closest("button")) return; if (held) { held = false; return; } openSheet(it.id, false); });
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target === li) openSheet(it.id, false); });
+  }
+
+  // ---------- actions ----------
+  function addItem(data, opts = {}) {
+    const it = norm({ id: uid(), title: data.title, category: data.category || "Experience", done: false, doneAt: null, createdAt: Date.now(), notes: "", links: [], photos: [], loc: data.loc || null });
+    items.push(it); save();
+    if (filter === "done") { filter = "todo"; syncTabs(); }
+    refresh();
+    if (opts.toast) toast(opts.toast, "Undo", () => { items = items.filter(i => i !== it); save(); refresh(); });
+    return it;
+  }
+  function toggle(it, fromEl) {
+    it.done = !it.done; it.doneAt = it.done ? Date.now() : null;
+    if (it.done) {
+      justDone = it.id; if (pickedId === it.id) pickedId = null;
+      if (fromEl) { const r = fromEl.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, catColor(it.category)); }
+      toast("Ticked off: " + short(it.title) + " 🎉");
+    }
+    save(); refresh();
+  }
+  function remove(it) {
+    const idx = items.indexOf(it); items = items.filter(i => i !== it);
+    if (pickedId === it.id) pickedId = null; save(); refresh();
+    const photos = it.photos.slice();
+    let undone = false;
+    toast("Deleted " + short(it.title), "Undo", () => { undone = true; items.splice(Math.min(idx, items.length), 0, it); save(); refresh(); });
+    setTimeout(() => { if (!undone) photos.forEach(delPhoto); }, 7000);
+  }
+  function addIdea() {
+    const have = new Set(items.map(i => i.title.toLowerCase()));
+    const pool = IDEAS.filter(i => !have.has(i.t.toLowerCase()));
+    if (!pool.length) { toast("You've used every idea. Impressive."); return; }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const it = addItem({ title: pick.t, category: pick.c, loc: pick.l ? { lat: pick.l[0], lng: pick.l[1], label: pick.l[2] } : null }, { toast: "Added " + short(pick.t, 26) });
+    pickedId = it.id; renderList();
+    const li = document.querySelector('li.item[data-id="' + it.id + '"]');
+    if (li) { li.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }); const r = li.getBoundingClientRect(); burst(r.left + 30, r.top + r.height / 2, catColor(it.category)); }
+    setTimeout(() => { if (pickedId === it.id) { pickedId = null; renderList(); } }, 2200);
+  }
+  function surprise() {
+    const pool = items.filter(i => !i.done && (!catFilter || (i.category || "Experience") === catFilter));
+    if (!pool.length) { toast("Nothing left to pick. Add some more goals!"); return; }
+    if (filter === "done") { filter = "todo"; syncTabs(); }
+    let n = 0; const steps = reduceMotion ? 1 : 12;
+    const spin = () => {
+      pickedId = pool[Math.floor(Math.random() * pool.length)].id; renderList();
+      if (++n < steps) setTimeout(spin, 60 + n * 18);
+      else {
+        const li = document.querySelector('li.item[data-id="' + pickedId + '"]'); const it = byId(pickedId);
+        if (li) { li.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }); const r = li.getBoundingClientRect(); burst(r.left + 30, r.top + r.height / 2, catColor(it.category)); }
+        if (it) toast("Your next adventure: " + short(it.title));
+      }
+    };
+    spin();
+  }
+
+  // ---------- toast ----------
+  function toast(msg, btnLabel, action) {
+    $("toastMsg").textContent = msg; toastAction = action || null;
+    $("toastBtn").hidden = !action; $("toastBtn").textContent = btnLabel || "Undo";
+    $("toast").hidden = false; clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $("toast").hidden = true; toastAction = null; }, action ? 6000 : 3500);
+  }
+  $("toastBtn").addEventListener("click", () => { const a = toastAction; toastAction = null; $("toast").hidden = true; if (a) a(); });
+
+  // ---------- confetti ----------
+  const fx = $("fx"), ctx = fx.getContext("2d"); let parts = [], raf = null;
   function burst(x, y, color) {
     if (reduceMotion) return;
-    const dpr = window.devicePixelRatio || 1;
-    fx.width = innerWidth * dpr; fx.height = innerHeight * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const cs = getComputedStyle(document.documentElement);
-    const palette = [color, cs.getPropertyValue("--accent").trim(), cs.getPropertyValue("--c-achieve").trim(), cs.getPropertyValue("--c-travel").trim(), cs.getPropertyValue("--c-exp").trim()];
-    for (let i = 0; i < 70; i++) {
-      const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 7;
-      parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 4, r: Math.random() * 6, w: 5 + Math.random() * 5, h: 3 + Math.random() * 4, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, c: palette[i % palette.length], life: 0 });
-    }
+    const dpr = devicePixelRatio || 1; fx.width = innerWidth * dpr; fx.height = innerHeight * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const pal = [color, catColor("Achievement"), catColor("Travel"), catColor("Experience"), "#ff6a3d"];
+    for (let i = 0; i < 70; i++) { const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 7; parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 4, w: 5 + Math.random() * 5, h: 3 + Math.random() * 4, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, c: pal[i % pal.length], life: 0 }); }
     if (!raf) raf = requestAnimationFrame(step);
   }
   function step() {
@@ -384,89 +680,275 @@ html, body { overscroll-behavior-y: none; }
     raf = parts.length ? requestAnimationFrame(step) : (ctx.clearRect(0, 0, innerWidth, innerHeight), null);
   }
 
-  // ---- actions ----
-  async function addItem(title, category) {
-    const now = Date.now();
-    const data = { title, category, done: false, doneAt: null, createdAt: now };
-    if (db) {
-      const ref = col.doc();
-      items.push({ id: ref.id, ...data }); render();
-      try { await ref.set(data); } catch (e) { showNote("Couldn't save that goal. Try again."); }
-    } else { items.push({ id: "l" + now, ...data }); saveLocal(); render(); }
+  // ---------- detail sheet ----------
+  function openSheet(id, focusTitle) {
+    const it = byId(id); if (!it) return; norm(it); openId = id;
+    $("scrim").hidden = false; $("sheet").hidden = false; document.body.classList.add("locked");
+    $("dResults").hidden = true; $("dLocMsg").textContent = ""; $("dLocQ").value = ""; $("dLinkIn").value = "";
+    $("sheet").scrollTop = 0;
+    fillSheet(it);
+    if (focusTitle) setTimeout(() => { const t = $("dTitle"); t.focus(); t.select(); }, 60);
   }
-  async function toggle(it, e) {
-    const done = !it.done, doneAt = done ? Date.now() : null;
-    it.done = done; it.doneAt = doneAt;
-    if (done) {
-      justDone = it.id; if (pickedId === it.id) pickedId = null;
-      const r = e.currentTarget.getBoundingClientRect();
-      burst(r.left + r.width / 2, r.top + r.height / 2, getComputedStyle(e.currentTarget).borderColor);
-      showToast("Ticked off: " + short(it.title) + " 🎉", false);
-    }
-    render(); saveLocal();
-    if (db) { try { await col.doc(it.id).update({ done, doneAt }); } catch (err) { showNote("Couldn't save that change."); } }
+  function closeSheet() {
+    const it = byId(openId);
+    if (it) { const t = $("dTitle").value.replace(/\s+/g, " ").trim(); if (t) it.title = t; save(); }
+    openId = null; $("scrim").hidden = true; $("sheet").hidden = true; document.body.classList.remove("locked"); refresh();
   }
-  async function remove(it) {
-    items = items.filter(i => i !== it); if (pickedId === it.id) pickedId = null; render(); saveLocal();
-    lastDeleted = it; showToast("Deleted " + short(it.title), true);
-    if (db) { try { await col.doc(it.id).delete(); } catch (e) { showNote("Couldn't delete that goal."); } }
+  function fillSheet(it) {
+    $("sheet").style.setProperty("--c", "var(" + catVar(it.category) + ")");
+    $("dCatPill").textContent = it.category || "Experience";
+    $("dTitle").value = it.title; autoGrow($("dTitle"));
+    $("dNotes").value = it.notes;
+    const dc = $("dCats"); dc.innerHTML = "";
+    CATS.forEach(cat => {
+      const b = el("button", null, cat.k); b.type = "button"; b.style.setProperty("--c", "var(" + cat.c + ")");
+      b.setAttribute("aria-pressed", String((it.category || "Experience") === cat.k));
+      b.addEventListener("click", () => { it.category = cat.k; save(); fillSheet(it); });
+      dc.appendChild(b);
+    });
+    const db = $("dDone"); db.className = "donebtn" + (it.done ? " is-done" : "");
+    db.innerHTML = ICON.check; db.append(it.done ? "Done " + fmtDate(it.doneAt) + " (tap to undo)" : "Tick it off");
+    renderSheetPhotos(it); renderSheetLoc(it); renderSheetLinks(it);
+    $("dCreated").textContent = "Added " + fmtDate(it.createdAt);
   }
-  async function undo() {
-    const it = lastDeleted; if (!it) return; lastDeleted = null; hideToast();
-    items.push(it); render(); saveLocal();
-    if (db) { const { id, ...data } = it; try { await col.doc(id).set(data); } catch (e) {} }
-  }
-  function surprise() {
-    const pool = items.filter(i => !i.done && (!catFilter || (i.category || "Experience") === catFilter));
-    if (!pool.length) { showToast("Nothing left to pick. Add some more goals!", false); return; }
-    if (filter === "done") { filter = "todo"; syncTabs(); }
-    let n = 0, steps = reduceMotion ? 1 : 12;
-    const spin = () => {
-      pickedId = pool[Math.floor(Math.random() * pool.length)].id; render();
-      if (++n < steps) setTimeout(spin, 60 + n * 18);
-      else {
-        const el = document.querySelector('li.item[data-id="' + CSS.escape(pickedId) + '"]');
-        if (el) { el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }); const r = el.getBoundingClientRect(); burst(r.left + 30, r.top + r.height / 2, getComputedStyle(el).getPropertyValue("--c")); }
-        const it = items.find(i => i.id === pickedId);
-        if (it) showToast("Your next adventure: " + short(it.title), false);
-      }
-    };
-    spin();
-  }
-  const short = (s) => "“" + (s.length > 30 ? s.slice(0, 30) + "…" : s) + "”";
-  function showToast(msg, withUndo) {
-    $("toastMsg").textContent = msg; $("undoBtn").hidden = !withUndo; $("toast").hidden = false;
-    clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, withUndo ? 6000 : 3500);
-  }
-  function hideToast() { $("toast").hidden = true; }
-  function showNote(msg) { const n = $("note"); n.textContent = msg; n.hidden = false; }
+  function autoGrow(t) { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }
+  $("dTitle").addEventListener("input", (e) => { autoGrow(e.target); const it = byId(openId); const v = e.target.value.replace(/\s+/g, " ").trim(); if (it && v) { it.title = v; save(); } });
+  $("dTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } });
+  let noteTimer = null;
+  $("dNotes").addEventListener("input", (e) => { const it = byId(openId); if (!it) return; it.notes = e.target.value; clearTimeout(noteTimer); noteTimer = setTimeout(save, 300); });
+  $("dDone").addEventListener("click", (e) => { const it = byId(openId); if (!it) return; toggle(it, e.currentTarget); fillSheet(it); });
+  $("dClose").addEventListener("click", closeSheet);
+  $("scrim").addEventListener("click", closeSheet);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("lightbox").hidden) $("lightbox").hidden = true; else if (openId) closeSheet(); } });
+  $("dDelete").addEventListener("click", () => { const it = byId(openId); if (!it) return; openId = null; $("scrim").hidden = true; $("sheet").hidden = true; document.body.classList.remove("locked"); remove(it); });
 
-  $("undoBtn").addEventListener("click", undo);
-  $("surprise").addEventListener("click", surprise);
+  // photos
+  async function renderSheetPhotos(it) {
+    const box = $("dPhotos"); box.innerHTML = "";
+    for (const pid of it.photos) {
+      const ph = el("div", "ph"); const img = el("img"); img.alt = "Photo for " + it.title; ph.appendChild(img);
+      const x = el("button", "x"); x.type = "button"; x.innerHTML = ICON.x; x.setAttribute("aria-label", "Remove photo");
+      x.addEventListener("click", (e) => { e.stopPropagation(); it.photos = it.photos.filter(p => p !== pid); save(); delPhoto(pid); renderSheetPhotos(it); });
+      ph.appendChild(x);
+      ph.addEventListener("click", () => { if (img.src) { $("lbImg").src = img.src; $("lightbox").hidden = false; } });
+      box.appendChild(ph);
+      photoUrl(pid).then(u => { if (u) img.src = u; });
+    }
+    const add = el("button", "ph-add"); add.type = "button"; add.innerHTML = ICON.cam; add.append(it.photos.length ? "Add more" : "Add photo");
+    add.addEventListener("click", () => { if (!idb) { toast("Photos aren't available in this browser."); return; } $("dPhotoFile").click(); });
+    box.appendChild(add);
+  }
+  $("dPhotoFile").addEventListener("change", async (e) => {
+    const it = byId(openId); const files = Array.from(e.target.files || []); e.target.value = "";
+    if (!it || !files.length) return;
+    for (const f of files) {
+      try { const b = await shrink(f); const pid = "p" + uid(); await putPhoto(pid, b); it.photos.push(pid); }
+      catch (err) { toast("Couldn't add that photo. Try a JPEG or PNG."); }
+    }
+    save(); renderSheetPhotos(it);
+  });
+  $("lightbox").addEventListener("click", () => { $("lightbox").hidden = true; });
+
+  // location
+  function renderSheetLoc(it) {
+    const box = $("dLocCard"); box.innerHTML = "";
+    if (!it.loc) return;
+    const c = el("div", "loc-card"); c.innerHTML = ICON.pin; c.appendChild(el("span", null, it.loc.label));
+    const show = el("button", "btn-sm alt", "Map"); show.type = "button";
+    show.addEventListener("click", () => { const id = it.id; closeSheet(); setView("map"); focusPin(id); });
+    const x = el("button", "x"); x.type = "button"; x.innerHTML = ICON.x; x.setAttribute("aria-label", "Remove place");
+    x.addEventListener("click", () => { it.loc = null; save(); renderSheetLoc(it); });
+    c.append(show, x); box.appendChild(c);
+  }
+  function setLoc(lat, lng, label) {
+    const it = byId(openId); if (!it) return;
+    it.loc = { lat: +lat, lng: +lng, label }; save();
+    $("dResults").hidden = true; $("dLocQ").value = ""; $("dLocMsg").textContent = "";
+    renderSheetLoc(it);
+    if (!it.category || it.category === "Experience") { /* leave category as chosen */ }
+  }
+  $("dLocForm").addEventListener("submit", async (e) => {
+    e.preventDefault(); const q = $("dLocQ").value.trim(); if (!q) return;
+    $("dLocMsg").textContent = "Searching…"; const box = $("dResults");
+    try {
+      const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=en-GB&q=" + encodeURIComponent(q));
+      const data = await r.json();
+      box.innerHTML = "";
+      if (!data.length) { $("dLocMsg").textContent = "No places found. Try a town or landmark name."; box.hidden = true; return; }
+      $("dLocMsg").textContent = "";
+      data.forEach(d => {
+        const b = el("button", null, d.display_name); b.type = "button";
+        b.addEventListener("click", () => { const parts = d.display_name.split(", "); setLoc(d.lat, d.lon, parts.length > 3 ? parts.slice(0, 2).concat(parts[parts.length - 1]).join(", ") : d.display_name); });
+        box.appendChild(b);
+      });
+      box.hidden = false;
+    } catch (err) { $("dLocMsg").textContent = "Couldn't search right now. Check your connection."; }
+  });
+  $("dHere").addEventListener("click", () => {
+    if (!navigator.geolocation) { $("dLocMsg").textContent = "Location isn't available here."; return; }
+    $("dLocMsg").textContent = "Finding you…";
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude: la, longitude: lo } = pos.coords; let label = "Pinned spot";
+      try {
+        const r = await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&accept-language=en-GB&lat=" + la + "&lon=" + lo);
+        const d = await r.json(); const a = d.address || {};
+        label = [a.suburb || a.village || a.town || a.city, a.city || a.county, a.country].filter((v, i, arr) => v && arr.indexOf(v) === i).join(", ") || label;
+      } catch (e) {}
+      setLoc(la, lo, label);
+    }, () => { $("dLocMsg").textContent = "Couldn't get your location. Check location permission."; }, { enableHighAccuracy: true, timeout: 12000 });
+  });
+
+  // links
+  function renderSheetLinks(it) {
+    const box = $("dLinks"); box.innerHTML = "";
+    it.links.forEach((l, i) => {
+      const row = el("div", "link-row");
+      const a = el("a"); a.href = l.url; a.target = "_blank"; a.rel = "noopener";
+      let host = l.url; try { const u = new URL(l.url); host = u.hostname.replace(/^www\./, "") + (u.pathname.length > 1 ? u.pathname : ""); } catch (e) {}
+      a.textContent = host;
+      const x = el("button", "x"); x.type = "button"; x.innerHTML = ICON.x; x.setAttribute("aria-label", "Remove link");
+      x.addEventListener("click", () => { it.links.splice(i, 1); save(); renderSheetLinks(it); });
+      row.append(a, x); box.appendChild(row);
+    });
+  }
+  $("dLinkForm").addEventListener("submit", (e) => {
+    e.preventDefault(); const it = byId(openId); let v = $("dLinkIn").value.trim(); if (!it || !v) return;
+    if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+    try { new URL(v); } catch (err) { toast("That doesn't look like a link."); return; }
+    it.links.push({ url: v }); save(); $("dLinkIn").value = ""; renderSheetLinks(it);
+  });
+
+  // ---------- map ----------
+  let map = null, layer = null, markers = {};
+  function initMap() {
+    if (map || !window.L) return;
+    map = L.map("map", { zoomControl: true, worldCopyJump: true }).setView([30, 0], 2);
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/" + (dark ? "dark_all" : "rastertiles/voyager") + "/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19, subdomains: "abcd",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+  }
+  function renderMap() {
+    if (!window.L) { $("mapNote").textContent = "The map needs an internet connection to load."; return; }
+    initMap(); setTimeout(() => map.invalidateSize(), 50);
+    layer.clearLayers(); markers = {};
+    const placed = items.filter(i => i.loc);
+    placed.forEach(it => {
+      const icon = L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -28],
+        html: '<div class="pin ' + (it.done ? "done" : "todo") + '" style="--c:' + catColor(it.category) + '">' + (it.done ? ICON.check : "") + "</div>" });
+      const m = L.marker([it.loc.lat, it.loc.lng], { icon, title: it.title }).addTo(layer);
+      const pop = el("div", "pop"); pop.appendChild(el("b", null, it.title));
+      pop.appendChild(el("small", null, (it.done ? "Done " + fmtDate(it.doneAt) + " · " : "") + it.loc.label));
+      const b = el("button", null, "Open"); b.type = "button"; b.addEventListener("click", () => { map.closePopup(); openSheet(it.id, false); });
+      pop.appendChild(b); m.bindPopup(pop);
+      markers[it.id] = m;
+    });
+    if (placed.length) {
+      const bounds = L.latLngBounds(placed.map(i => [i.loc.lat, i.loc.lng]));
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 6 });
+    }
+    const without = items.length - placed.length;
+    $("mapNote").textContent = placed.length
+      ? placed.length + " goal" + (placed.length === 1 ? "" : "s") + " pinned. " + (without ? without + " more have no place yet. Open one and add a place to pin it." : "")
+      : "No goals pinned yet. Open a goal, then search for a place to drop a pin here.";
+  }
+  function focusPin(id) {
+    const it = byId(id); if (!it || !it.loc || !map) return;
+    setTimeout(() => { map.setView([it.loc.lat, it.loc.lng], 8); if (markers[id]) markers[id].openPopup(); }, 120);
+  }
+
+  // ---------- stats ----------
+  function renderStats() {
+    renderHeader();
+    const total = items.length, doneItems = items.filter(i => i.done), done = doneItems.length;
+    const now = Date.now(), year = new Date().getFullYear();
+    const thisYear = doneItems.filter(i => i.doneAt && new Date(i.doneAt).getFullYear() === year);
+    const latest = doneItems.slice().sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0))[0];
+    const waiting = items.filter(i => !i.done).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0];
+    const places = items.filter(i => i.loc), placesDone = places.filter(i => i.done);
+    const photos = items.reduce((n, i) => n + ((i.photos && i.photos.length) || 0), 0);
+    const countries = new Set(placesDone.map(i => i.loc.label.split(", ").pop()));
+    const g = $("statGrid"); g.innerHTML = "";
+    const tile = (k, v, s, cls) => { const t = el("div", "stat" + (cls ? " " + cls : "")); t.appendChild(el("span", "k", k)); const vv = el("span", "v"); if (typeof v === "string" || typeof v === "number") vv.textContent = v; else vv.appendChild(v); t.appendChild(vv); if (s) t.appendChild(el("span", "s", s)); g.appendChild(t); };
+
+    tile("Latest win", latest ? latest.title : "Still to come", latest ? fmtDate(latest.doneAt) : "Tick off your first goal to see it here", "wide hero");
+    const frac = document.createDocumentFragment(); frac.append(String(done)); const sm = el("small", null, " / " + total); frac.appendChild(sm);
+    tile("Ticked off", frac, total ? Math.round(done / total * 100) + "% of your list" : "");
+    tile("This year", thisYear.length, thisYear.length ? "Done in " + year : "Nothing yet in " + year);
+    tile("Places pinned", places.length, placesDone.length ? placesDone.length + " visited · " + countries.size + " countr" + (countries.size === 1 ? "y" : "ies") : "Add places to goals");
+    tile("Photos", photos, photos ? "Memories saved" : "Add photos to goals");
+    if (waiting) {
+      const days = Math.max(0, Math.floor((now - (waiting.createdAt || now)) / DAY));
+      tile("Waiting longest", waiting.title, days ? "On your list for " + days + " day" + (days === 1 ? "" : "s") : "Added today", "wide");
+    }
+
+    const bars = $("catBars"); bars.innerHTML = "";
+    CATS.forEach(cat => {
+      const all = items.filter(i => (i.category || "Experience") === cat.k), d = all.filter(i => i.done).length;
+      const row = el("div", "bar-row"); row.style.setProperty("--c", "var(" + cat.c + ")");
+      row.appendChild(el("span", "lbl", cat.k));
+      const trk = el("div", "trk"); const f = el("div", "fill"); f.style.width = (all.length ? d / all.length * 100 : 0) + "%"; trk.appendChild(f); row.appendChild(trk);
+      row.appendChild(el("span", "num", d + "/" + all.length));
+      bars.appendChild(row);
+    });
+
+    $("yearLabel").textContent = "Ticked off in " + year;
+    const months = Array(12).fill(0); thisYear.forEach(i => months[new Date(i.doneAt).getMonth()]++);
+    const mx = Math.max(1, ...months); const yb = $("yearBars"); yb.innerHTML = "";
+    months.forEach((n, m) => { const d = el("div", n ? "on" : ""); d.style.height = (n ? 12 + n / mx * 88 : 4) + "%"; d.title = n + " in " + new Date(year, m, 1).toLocaleDateString("en-GB", { month: "long" }); yb.appendChild(d); });
+  }
+
+  // backup
+  $("exportBtn").addEventListener("click", async () => {
+    const photos = {};
+    for (const it of items) for (const pid of (it.photos || [])) {
+      try { const b = await getPhoto(pid); if (b) photos[pid] = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }); } catch (e) {}
+    }
+    const blob = new Blob([JSON.stringify({ app: "bucket-list", version: 2, savedAt: new Date().toISOString(), items, photos })], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "bucket-list-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast("Backup saved");
+  });
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!data || !Array.isArray(data.items)) throw new Error("bad");
+      const prev = items;
+      for (const [pid, url] of Object.entries(data.photos || {})) { try { const b = await (await fetch(url)).blob(); await putPhoto(pid, b); } catch (err) {} }
+      items = data.items.map(norm); save(); refresh();
+      toast("Restored " + items.length + " goals", "Undo", () => { items = prev; save(); refresh(); });
+    } catch (err) { toast("That file isn't a Bucket List backup."); }
+  });
+
+  // ---------- views & tabs ----------
+  function setView(v) {
+    view = v;
+    document.querySelectorAll(".views button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.v === v)));
+    ["list", "map", "stats"].forEach(x => { $("view-" + x).hidden = x !== v; });
+    refresh();
+  }
+  function refresh() { if (view === "list") renderList(); else if (view === "map") { renderHeader(); renderMap(); } else renderStats(); }
+  document.querySelectorAll(".views button").forEach(b => b.addEventListener("click", () => setView(b.dataset.v)));
+  function syncTabs() { document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.f === filter))); }
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { filter = b.dataset.f; pickedId = null; syncTabs(); renderList(); }));
+
   $("newTitle").addEventListener("input", e => { $("addBtn").disabled = !e.target.value.trim(); });
   $("addForm").addEventListener("submit", e => {
-    e.preventDefault();
-    const v = $("newTitle").value.trim(); if (!v) return;
-    addItem(v, $("newCat").value);
+    e.preventDefault(); const v = $("newTitle").value.trim(); if (!v) return;
+    addItem({ title: v, category: $("newCat").value });
     $("newTitle").value = ""; $("addBtn").disabled = true; $("newTitle").focus();
-    if (filter === "done") { filter = "todo"; syncTabs(); render(); }
   });
-  function syncTabs() { document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.f === filter))); }
-  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { filter = b.dataset.f; pickedId = null; syncTabs(); render(); }));
+  $("ideaBtn").addEventListener("click", addIdea);
+  $("surprise").addEventListener("click", surprise);
 
-  render();
-
-  const SEED = [{"id": "s0", "title": "Shoot a gun", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759600000}, {"id": "s1", "title": "Win on a game show", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599999}, {"id": "s2", "title": "Get a Guinness World Record", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599998}, {"id": "s3", "title": "Go skydiving", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599997}, {"id": "s4", "title": "Do a bungee jump", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599996}, {"id": "s5", "title": "Swim with sharks", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599995}, {"id": "s6", "title": "See the Northern Lights", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599994}, {"id": "s7", "title": "Drive Route 66", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599993}, {"id": "s8", "title": "Visit Japan", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599992}, {"id": "s9", "title": "See one of the Seven Wonders of the World", "category": "Travel", "done": false, "doneAt": null, "createdAt": 1792759599991}, {"id": "s10", "title": "Run a marathon", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599990}, {"id": "s11", "title": "Climb Ben Nevis", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599989}, {"id": "s12", "title": "Watch a cup final at Wembley", "category": "Experience", "done": false, "doneAt": null, "createdAt": 1792759599988}, {"id": "s13", "title": "Take a hot air balloon ride", "category": "Experience", "done": false, "doneAt": null, "createdAt": 1792759599987}, {"id": "s14", "title": "Sleep under the stars", "category": "Experience", "done": false, "doneAt": null, "createdAt": 1792759599986}, {"id": "s15", "title": "Drive a supercar on a track", "category": "Thrill", "done": false, "doneAt": null, "createdAt": 1792759599985}, {"id": "s16", "title": "Learn to play an instrument", "category": "Skill", "done": false, "doneAt": null, "createdAt": 1792759599984}, {"id": "s17", "title": "Learn a new language", "category": "Skill", "done": false, "doneAt": null, "createdAt": 1792759599983}, {"id": "s18", "title": "Do a stand-up comedy set", "category": "Achievement", "done": false, "doneAt": null, "createdAt": 1792759599982}];
-  function startLocal() {
-    let saved = null;
-    try { saved = localStorage.getItem(LS); } catch (e) {}
-    if (saved === null) { items = SEED.map(x => ({ ...x })); saveLocal(); }
-    else { try { items = JSON.parse(saved) || []; } catch (e) { items = []; } }
-    loaded = true; render();
-  }
-  startLocal();
+  load(); items.forEach(norm); renderList();
+  openDb();
 })();
 </script>
-
 </body>
 </html>
